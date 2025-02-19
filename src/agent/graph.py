@@ -1,16 +1,16 @@
-from typing import Dict
+from typing import Dict, Literal
 
-from utils.schemas import Events
+from src.utils.schemas import Events
 from langchain_core.messages import HumanMessage
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
-from state import State
+from src.agent.state import State, CustomReactState
 from langgraph.types import interrupt
 from langgraph.store.memory import InMemoryStore
 from langchain_openai import ChatOpenAI
 from langmem import create_memory_store_manager
-from tools import luma_scraper, bike_planner
+from src.tools import luma_scraper, bike_planner
 
 model = ChatOpenAI(model="gpt-4o")
 
@@ -34,30 +34,31 @@ async def ask_schedule(state: State) -> Dict:
             "question": "What is your schedule for this weekend? What do you want to do?"
         }
     )
-    # Save any preferences to memory
-    await memory_manager.ainvoke(state['messages']+[HumanMessage(content=weekend_schedule)])
-    return {"messages": [HumanMessage(content=weekend_schedule)]}
+   
+    return {"messages": [HumanMessage(content=weekend_schedule['answer'])]}
 
 async def plan_weekend(state: State) -> Dict:
     """Process user's schedule response and save to memory."""
+    # Save any preferences to memory
+    await memory_manager.ainvoke({"messages": state['messages']})
     schedule = state["messages"][-1].content
-    agent = create_react_agent(model=model, tools=[luma_scraper, bike_planner], response_mode=Events)
-    response = agent.invoke(schedule)
-    
-    return {"events": response.events}
+    agent = create_react_agent(state_schema=CustomReactState, model=model, tools=[luma_scraper, bike_planner], response_format=Events)
+    response = agent.invoke({'messages': [HumanMessage(content=schedule)]})
+    return {"events": response['structured_response'].events, "messages": response['messages']}
     
 async def confirm_with_user(state: State) -> Dict:
     """Ask user to confirm the planned schedule."""
     # Send an email in real life
     confirm = interrupt(
         {
-            "question": "Is this what you want to do this weekend?"
+            "question": "Would you like to edit the schedule?",
+            "events": state['events']
         }
     )
     return {"reflect": confirm}
 
-def decide_whether_to_reflect(state: State) -> str:
-    if state['refect']:
+def decide_whether_to_reflect(state: State) -> Literal["plan_weekend", "__end__"]:
+    if state['reflect']:
         return "plan_weekend"
     else:
         return "__end__"
