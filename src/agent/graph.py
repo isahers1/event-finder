@@ -1,7 +1,7 @@
 from typing import Dict, Literal
 
 from src.utils.schemas import Events
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
@@ -37,13 +37,23 @@ async def ask_schedule(state: State) -> Dict:
    
     return {"messages": [HumanMessage(content=weekend_schedule['answer'])]}
 
+PLANNER_SYSTEM_PROMPT = """You are a helpful planner
+
+You will be given a user's preferences for what to do during the weekend and you will generate a list of Events they should attend.
+
+Here are some things to keep in mind:
+- The user will most likely want to do exercise during daylight hours
+- Do not schedule 2 events at the same time
+- Make sure to account for the time taken to travel between events
+"""
+
 async def plan_weekend(state: State) -> Dict:
     """Process user's schedule response and save to memory."""
     # Save any preferences to memory
     await memory_manager.ainvoke({"messages": state['messages']})
     schedule = state["messages"][-1].content
     agent = create_react_agent(state_schema=CustomReactState, model=model, tools=[luma_scraper, bike_planner], response_format=Events)
-    response = agent.invoke({'messages': [HumanMessage(content=schedule)]})
+    response = agent.invoke({'messages': [SystemMessage(content=PLANNER_SYSTEM_PROMPT), HumanMessage(content=schedule)]})
     return {"events": response['structured_response'].events, "messages": response['messages']}
     
 async def confirm_with_user(state: State) -> Dict:

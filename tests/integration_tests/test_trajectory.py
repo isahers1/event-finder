@@ -1,12 +1,14 @@
 from src.agent import graph
 import pytest
 from langgraph.types import Command
-from agentevals.evaluators.trajectory.llm import create_trajectory_llm_as_judge
+from agentevals.trajectory.llm import create_trajectory_llm_as_judge, TRAJECTORY_ACCURACY_PROMPT
 
 @pytest.mark.langsmith
 @pytest.mark.asyncio
 async def test_simple_trajectory():
     thread_config = {"configurable": {"thread_id": "some_id"}}
+
+    # Sample run through of agent
     await graph.ainvoke({"messages": []}, config=thread_config)
     # First resume
     await graph.ainvoke(Command(resume={
@@ -16,12 +18,17 @@ async def test_simple_trajectory():
     await graph.ainvoke(Command(resume=False), config=thread_config)
 
     history = graph.get_state(thread_config)
-    print(history.values['messages'])
-    evaluator = create_trajectory_llm_as_judge()
+
+    # Create evaluator
+    evaluator = create_trajectory_llm_as_judge(prompt=TRAJECTORY_ACCURACY_PROMPT, model="openai:o3-mini")
     eval_result = evaluator(
-        outputs=history.values['messages'],
+        outputs=history.values,
     )
+
+    # For demo purposes
     print(eval_result)
+
+    assert eval_result['score'] == 1
 
 
 

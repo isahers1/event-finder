@@ -3,14 +3,14 @@ name = "event-finder-agent"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<4.0"
 dependencies = [
-    "agentevals==0.0.1rc5",
+    "agentevals==0.0.1rc7",
     "beautifulsoup4>=4.13.3",
     "langchain-community>=0.3.17",
     "langchain-core>=0.3.36",
     "langchain-openai>=0.3.6",
     "langgraph>=0.2.74",
     "langmem>=0.0.10",
-    "openevals==0.0.1rc4",
+    "openevals==0.0.1rc6",
 ]
